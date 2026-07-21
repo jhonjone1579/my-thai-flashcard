@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ထိုင်းစာ မီနီ Flashcard App</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            text-align: center; 
+            background-color: #f3f4f6; 
+            padding: 20px 10px;
+        }
+        .container { max-width: 400px; margin: 0 auto; }
+        .card, .form-container, .list-container { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 15px; 
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); 
+            margin-bottom: 20px;
+        }
+        h1 { color: #2563eb; font-size: 32px; margin: 10px 0; }
+        p { font-size: 18px; color: #4b5563; }
+        input {
+            width: 80%;
+            padding: 10px;
+            margin: 6px 0;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        button { 
+            background: #2563eb; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            font-size: 15px; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            margin-top: 8px;
+        }
+        button:hover { background: #1d4ed8; }
+        .add-btn { background: #10b981; }
+        .add-btn:hover { background: #059669; }
+        
+        /* စာရင်းနှင့် ဖျက်ခလုတ် ဒီဇိုင်း */
+        ul { padding: 0; list-style: none; }
+        li { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding: 8px 12px; 
+            background: #f9fafb; 
+            margin-bottom: 8px; 
+            border-radius: 8px; 
+            border: 1px solid #e5e7eb;
+        }
+        .delete-btn { 
+            background: #ef4444; 
+            color: white; 
+            padding: 4px 8px; 
+            font-size: 12px; 
+            border-radius: 5px; 
+            margin: 0;
+        }
+        .delete-btn:hover { background: #dc2626; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>💡 ထိုင်းစာ ဝေါဟာရ လေ့ကျင့်ခန်း</h2>
+
+        <div class="form-container">
+            <h3>➕ စကားလုံးအသစ် ထည့်မည်</h3>
+            <input type="text" id="thaiInput" placeholder="ထိုင်းစာ (ဥပမာ- เรียน)">
+            <input type="text" id="myanmarInput" placeholder="မြန်မာစာ (ဥပမာ- စာသင်သည်)">
+            <br>
+            <button id="addBtn" class="add-btn">ပေါင်းထည့်မည်</button>
+        </div>
+
+        <div class="card">
+            <h1 id="thaiDisplay">คำศัพท์</h1>
+            <p id="myanmarDisplay">အဓိပ္ပာယ်</p>
+            <button id="nextBtn">➡️ နောက်တစ်လုံး</button>
+        </div>
+
+        <div class="list-container">
+            <h3 style="text-align: left;">📜 စာရင်းများ</h3>
+            <ul id="vocabListUI"></ul>
+        </div>
+    </div>
+
+    <script>
+        // LocalStorage မှ ဒေတာ ယူခြင်း
+        let vocabData = JSON.parse(localStorage.getItem('myThaiVocab')) || [
+            { thai: "เข้าเวร", myanmar: "ဂျူတီဝင်သည်" },
+            { thai: "ออกเวร", myanmar: "ဂျူတီဆင်းသည်" }
+        ];
+
+        let currentIndex = 0;
+
+        // DOM Elements
+        const thaiDisplay = document.getElementById('thaiDisplay');
+        const myanmarDisplay = document.getElementById('myanmarDisplay');
+        const nextBtn = document.getElementById('nextBtn');
+        const vocabListUI = document.getElementById('vocabListUI');
+        
+        const thaiInput = document.getElementById('thaiInput');
+        const myanmarInput = document.getElementById('myanmarInput');
+        const addBtn = document.getElementById('addBtn');
+
+        // LocalStorage သို့ သိမ်းခြင်း
+        function saveToLocalStorage() {
+            localStorage.setItem('myThaiVocab', JSON.stringify(vocabData));
+        }
+
+        // ကတ်ပြောင်းပေးသည့် ဖန်ရှင်
+        function updateCard() {
+            if (vocabData.length > 0) {
+                // index လွန်နေပါက ၀ သို့ ပြန်ညှိခြင်း
+                if (currentIndex >= vocabData.length) currentIndex = 0;
+                thaiDisplay.innerText = vocabData[currentIndex].thai;
+                myanmarDisplay.innerText = vocabData[currentIndex].myanmar;
+            } else {
+                thaiDisplay.innerText = "စာရင်းမရှိပါ";
+                myanmarDisplay.innerText = "စကားလုံးအသစ် ထည့်ပါ";
+            }
+        }
+
+        // 🎯 စာရင်းနှင့် ဖျက်ခလုတ်ကို ရေးဆွဲပေးသည့် ဖန်ရှင်
+        function renderList() {
+            vocabListUI.innerHTML = "";
+            vocabData.forEach((item, index) => {
+                const li = document.createElement('li');
+                
+                // စာသားနှင့် ဖျက်ခလုတ်ကို အတူတူ ထည့်သွင်းခြင်း
+                li.innerHTML = `
+                    <span>${index + 1}. <b>${item.thai}</b> = ${item.myanmar}</span>
+                    <button class="delete-btn" onclick="deleteVocab(${index})">❌ ဖျက်မည်</button>
+                `;
+                vocabListUI.appendChild(li);
+            });
+        }
+
+        // 🎯 စကားလုံး ဖျက်သည့် ဖန်ရှင်
+        function deleteVocab(index) {
+            // ၁။ Array ထဲမှ အကွက်ကို ဖျက်ခြင်း
+            vocabData.splice(index, 1);
+
+            // ၂။ LocalStorage တွင် ပြန်သိမ်းခြင်း
+            saveToLocalStorage();
+
+            // ၃။ မျက်နှာပြင် ပြန်လည် အသစ်ဆွဲခြင်း
+            renderList();
+            updateCard();
+        }
+
+        // စတင်ချိန်တွင် ခေါ်ယူခြင်း
+        updateCard();
+        renderList();
+
+        // နောက်တစ်လုံး ခလုတ်
+        nextBtn.addEventListener('click', () => {
+            if (vocabData.length > 0) {
+                currentIndex++;
+                if (currentIndex >= vocabData.length) currentIndex = 0;
+                updateCard();
+            }
+        });
+
+        // စကားလုံးအသစ် ပေါင်းထည့်သည့် ခလုတ်
+        addBtn.addEventListener('click', () => {
+            const thaiVal = thaiInput.value;
+            const myanmarVal = myanmarInput.value;
+
+            if (thaiVal === "" || myanmarVal === "") {
+                alert("ကျေးဇူးပြု၍ စာသားများ အပြည့်အစုံ ဖြည့်ပေးပါဗျာ!");
+                return;
+            }
+
+            vocabData.push({ thai: thaiVal, myanmar: myanmarVal });
+            saveToLocalStorage();
+            renderList();
+            updateCard();
+
+            thaiInput.value = "";
+            myanmarInput.value = "";
+        });
+    </script>
+
+</body>
+</html>
