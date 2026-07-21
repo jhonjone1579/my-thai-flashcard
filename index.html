@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ထိုင်းစာ မီနီ Flashcard App</title>
+    <title>ထိုင်းစာ Pro Flashcard App (Audio)</title>
     <style>
         body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
@@ -12,16 +12,42 @@
             padding: 20px 10px;
         }
         .container { max-width: 400px; margin: 0 auto; }
-        .card, .form-container, .list-container { 
+        .card, .form-container, .list-container, .backup-container { 
             background: white; 
             padding: 20px; 
             border-radius: 15px; 
             box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); 
             margin-bottom: 20px;
         }
-        h1 { color: #2563eb; font-size: 32px; margin: 10px 0; }
+        
+        /* စပီကာနှင့် စာသား ယှဉ်တွဲပြသမည့် ဒီဇိုင်း */
+        .thai-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        h1 { color: #2563eb; font-size: 32px; margin: 0; }
+        .audio-btn {
+            background: #e0e7ff;
+            color: #2563eb;
+            border: none;
+            border-radius: 50%;
+            width: 42px;
+            height: 42px;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.1s;
+        }
+        .audio-btn:active { transform: scale(0.9); }
+        .audio-btn:hover { background: #c7d2fe; }
+
         p { font-size: 18px; color: #4b5563; }
-        input {
+        input[type="text"] {
             width: 80%;
             padding: 10px;
             margin: 6px 0;
@@ -33,17 +59,20 @@
             background: #2563eb; 
             color: white; 
             border: none; 
-            padding: 10px 20px; 
-            font-size: 15px; 
+            padding: 10px 16px; 
+            font-size: 14px; 
             border-radius: 8px; 
             cursor: pointer; 
-            margin-top: 8px;
+            margin: 4px;
         }
         button:hover { background: #1d4ed8; }
         .add-btn { background: #10b981; }
         .add-btn:hover { background: #059669; }
+        .backup-btn { background: #8b5cf6; }
+        .backup-btn:hover { background: #7c3aed; }
+        .restore-btn { background: #f59e0b; }
+        .restore-btn:hover { background: #d97706; }
         
-        /* စာရင်းနှင့် ဖျက်ခလုတ် ဒီဇိုင်း */
         ul { padding: 0; list-style: none; }
         li { 
             display: flex; 
@@ -54,6 +83,16 @@
             margin-bottom: 8px; 
             border-radius: 8px; 
             border: 1px solid #e5e7eb;
+        }
+        .list-actions { display: flex; gap: 4px; }
+        .small-audio-btn {
+            background: #e0e7ff;
+            color: #2563eb;
+            border: none;
+            padding: 4px 8px;
+            font-size: 12px;
+            border-radius: 5px;
+            cursor: pointer;
         }
         .delete-btn { 
             background: #ef4444; 
@@ -80,7 +119,10 @@
         </div>
 
         <div class="card">
-            <h1 id="thaiDisplay">คำศัพท์</h1>
+            <div class="thai-header">
+                <h1 id="thaiDisplay">คำศัพท์</h1>
+                <button id="speakerBtn" class="audio-btn" title="အသံနားထောင်မည်">🔊</button>
+            </div>
             <p id="myanmarDisplay">အဓိပ္ပာယ်</p>
             <button id="nextBtn">➡️ နောက်တစ်လုံး</button>
         </div>
@@ -89,36 +131,68 @@
             <h3 style="text-align: left;">📜 စာရင်းများ</h3>
             <ul id="vocabListUI"></ul>
         </div>
+
+        <div class="backup-container">
+            <h3>💾 ဒေတာ ထိန်းသိမ်းမှု စနစ်</h3>
+            <button id="exportBtn" class="backup-btn">📥 Backup ဖိုင် သိမ်းမည်</button>
+            <button id="importBtn" class="restore-btn">📤 Backup ပြန်တင်မည်</button>
+            <input type="file" id="importInput" accept=".json" style="display: none;">
+        </div>
     </div>
 
     <script>
-        // LocalStorage မှ ဒေတာ ယူခြင်း
-        let vocabData = JSON.parse(localStorage.getItem('myThaiVocab')) || [
+        // မူလ အခြေခံ ဝေါဟာရများ
+        const defaultVocab = [
             { thai: "เข้าเวร", myanmar: "ဂျူတီဝင်သည်" },
-            { thai: "ออกเวร", myanmar: "ဂျူတီဆင်းသည်" }
+            { thai: "ออกเวร", myanmar: "ဂျူတီဆင်းသည်" },
+            { thai: "สวัสดี", myanmar: "မင်္ဂလာပါ" },
+            { thai: "ขอบคุณ", myanmar: "ကျေးဇူးတင်ပါတယ်" },
+            { thai: "กินข้าว", myanmar: "ထမင်းစားသည်" },
+            { thai: "ทำงาน", myanmar: "အလုပ်လုပ်သည်" }
         ];
 
+        let vocabData = JSON.parse(localStorage.getItem('myThaiVocab')) || defaultVocab;
         let currentIndex = 0;
 
         // DOM Elements
         const thaiDisplay = document.getElementById('thaiDisplay');
         const myanmarDisplay = document.getElementById('myanmarDisplay');
         const nextBtn = document.getElementById('nextBtn');
+        const speakerBtn = document.getElementById('speakerBtn');
         const vocabListUI = document.getElementById('vocabListUI');
         
         const thaiInput = document.getElementById('thaiInput');
         const myanmarInput = document.getElementById('myanmarInput');
         const addBtn = document.getElementById('addBtn');
 
+        const exportBtn = document.getElementById('exportBtn');
+        const importBtn = document.getElementById('importBtn');
+        const importInput = document.getElementById('importInput');
+
+        // 🎯 ထိုင်းစာ အသံထွက်ပေးသည့် ဖန်ရှင် (Web Speech API)
+        function speakThai(text) {
+            if ('speechSynthesis' in window) {
+                // လက်ရှိ ထွက်နေသော အသံရှိပါက ခေတ္တ ရပ်ဆိုင်းမည်
+                window.speechSynthesis.cancel();
+
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'th-TH'; // ထိုင်းဘာသာစကား သတ်မှတ်ခြင်း
+                utterance.rate = 0.85;    // အသံထွက် ရှင်းလင်းစေရန် အနည်းငယ် နှေးပေးထားသည်
+
+                window.speechSynthesis.speak(utterance);
+            } else {
+                alert("သင့် ဘရောင်ဆာသည် အသံထွက်စနစ်ကို မပံ့ပိုးပါဗျာ။");
+            }
+        }
+
         // LocalStorage သို့ သိမ်းခြင်း
         function saveToLocalStorage() {
             localStorage.setItem('myThaiVocab', JSON.stringify(vocabData));
         }
 
-        // ကတ်ပြောင်းပေးသည့် ဖန်ရှင်
+        // Flashcard ပြောင်းပေးသည့် ဖန်ရှင်
         function updateCard() {
             if (vocabData.length > 0) {
-                // index လွန်နေပါက ၀ သို့ ပြန်ညှိခြင်း
                 if (currentIndex >= vocabData.length) currentIndex = 0;
                 thaiDisplay.innerText = vocabData[currentIndex].thai;
                 myanmarDisplay.innerText = vocabData[currentIndex].myanmar;
@@ -128,30 +202,26 @@
             }
         }
 
-        // 🎯 စာရင်းနှင့် ဖျက်ခလုတ်ကို ရေးဆွဲပေးသည့် ဖန်ရှင်
+        // စာရင်း ပြန်ဆွဲပေးသည့် ဖန်ရှင်
         function renderList() {
             vocabListUI.innerHTML = "";
             vocabData.forEach((item, index) => {
                 const li = document.createElement('li');
-                
-                // စာသားနှင့် ဖျက်ခလုတ်ကို အတူတူ ထည့်သွင်းခြင်း
                 li.innerHTML = `
                     <span>${index + 1}. <b>${item.thai}</b> = ${item.myanmar}</span>
-                    <button class="delete-btn" onclick="deleteVocab(${index})">❌ ဖျက်မည်</button>
+                    <div class="list-actions">
+                        <button class="small-audio-btn" onclick="speakThai('${item.thai}')">🔊</button>
+                        <button class="delete-btn" onclick="deleteVocab(${index})">❌</button>
+                    </div>
                 `;
                 vocabListUI.appendChild(li);
             });
         }
 
-        // 🎯 စကားလုံး ဖျက်သည့် ဖန်ရှင်
+        // စကားလုံး ဖျက်သည့် ဖန်ရှင်
         function deleteVocab(index) {
-            // ၁။ Array ထဲမှ အကွက်ကို ဖျက်ခြင်း
             vocabData.splice(index, 1);
-
-            // ၂။ LocalStorage တွင် ပြန်သိမ်းခြင်း
             saveToLocalStorage();
-
-            // ၃။ မျက်နှာပြင် ပြန်လည် အသစ်ဆွဲခြင်း
             renderList();
             updateCard();
         }
@@ -159,6 +229,13 @@
         // စတင်ချိန်တွင် ခေါ်ယူခြင်း
         updateCard();
         renderList();
+
+        // 🎯 စပီကာ ခလုတ် နှိပ်ပါက အသံထွက်ပေးခြင်း
+        speakerBtn.addEventListener('click', () => {
+            if (vocabData.length > 0) {
+                speakThai(vocabData[currentIndex].thai);
+            }
+        });
 
         // နောက်တစ်လုံး ခလုတ်
         nextBtn.addEventListener('click', () => {
@@ -186,6 +263,44 @@
 
             thaiInput.value = "";
             myanmarInput.value = "";
+        });
+
+        // Backup Export
+        exportBtn.addEventListener('click', () => {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(vocabData, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", "thai_vocab_backup.json");
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        });
+
+        // Backup Import
+        importBtn.addEventListener('click', () => importInput.click());
+
+        importInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const importedData = JSON.parse(event.target.result);
+                    if (Array.isArray(importedData)) {
+                        vocabData = importedData;
+                        saveToLocalStorage();
+                        renderList();
+                        updateCard();
+                        alert("🎉 Backup ဒေတာများ အောင်မြင်စွာ ပြန်တင်ပြီးပါပြီ!");
+                    } else {
+                        alert("ဖိုင်ပုံစံ မှားယွင်းနေပါသည်။");
+                    }
+                } catch (err) {
+                    alert("ဖိုင်ဖတ်ရာတွင် အမှားအယွင်း ရှိနေပါသည်။");
+                }
+            };
+            reader.readAsText(file);
         });
     </script>
 
